@@ -14,17 +14,22 @@ function saveLocalRecords(records) {
 
 export async function fetchAllRecords() {
   if (isSupabaseAvailable) {
-    const { data, error } = await supabase
-      .from('poo_records')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data.map(r => ({
-      id: r.id,
-      timestamp: r.created_at,
-      note: r.note || '',
-      nickname: r.user_nickname
-    }));
+    try {
+      const { data, error } = await supabase
+        .from('poo_records')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data.map(r => ({
+        id: r.id,
+        timestamp: r.created_at,
+        note: r.note || '',
+        nickname: r.user_nickname
+      }));
+    } catch (e) {
+      console.warn('Supabase 查询失败，使用本地存储:', e.message);
+      return getLocalRecords().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
   } else {
     return getLocalRecords().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   }
@@ -33,18 +38,32 @@ export async function fetchAllRecords() {
 export async function addRecord(note = '') {
   const nickname = ensureNickname();
   if (isSupabaseAvailable) {
-    const { data, error } = await supabase
-      .from('poo_records')
-      .insert([{ user_nickname: nickname, note }])
-      .select();
-    if (error) throw error;
-    const record = data[0];
-    return {
-      id: record.id,
-      timestamp: record.created_at,
-      note: record.note || '',
-      nickname: record.user_nickname
-    };
+    try {
+      const { data, error } = await supabase
+        .from('poo_records')
+        .insert([{ user_nickname: nickname, note }])
+        .select();
+      if (error) throw error;
+      const record = data[0];
+      return {
+        id: record.id,
+        timestamp: record.created_at,
+        note: record.note || '',
+        nickname: record.user_nickname
+      };
+    } catch (e) {
+      console.warn('Supabase 写入失败，使用本地存储:', e.message);
+      const records = getLocalRecords();
+      const newRecord = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        note,
+        nickname
+      };
+      records.push(newRecord);
+      saveLocalRecords(records);
+      return newRecord;
+    }
   } else {
     const records = getLocalRecords();
     const newRecord = {
@@ -61,17 +80,25 @@ export async function addRecord(note = '') {
 
 export async function deleteRecord(id) {
   if (isSupabaseAvailable) {
-    const { error } = await supabase
-      .from('poo_records')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-    return true;
+    try {
+      const { error } = await supabase
+        .from('poo_records')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('Supabase 删除失败，使用本地存储:', e.message);
+      const records = getLocalRecords();
+      const filtered = records.filter(r => r.id !== id);
+      saveLocalRecords(filtered);
+      return true;
+    }
   } else {
     const records = getLocalRecords();
     const filtered = records.filter(r => r.id !== id);
     saveLocalRecords(filtered);
-    return filtered;
+    return true;
   }
 }
 

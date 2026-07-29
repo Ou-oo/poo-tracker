@@ -1,8 +1,8 @@
 <template>
   <div class="quick-record">
-    <button class="record-btn" @click="handleClick">
-      <span class="btn-icon">💩</span>
-      <span class="btn-text">记录一次</span>
+    <button class="record-btn" :disabled="loading" @click="handleClick">
+      <span class="btn-icon">{{ loading ? '⏳' : '💩' }}</span>
+      <span class="btn-text">{{ loading ? '保存中...' : '记录一次' }}</span>
     </button>
     <div v-if="showNote" class="note-input-wrapper">
       <input
@@ -12,9 +12,13 @@
         placeholder="添加备注（可选）"
         @keyup.enter="confirmNote"
         autofocus
+        :disabled="loading"
       />
-      <button class="confirm-btn" @click="confirmNote">确认</button>
+      <button class="confirm-btn" @click="confirmNote" :disabled="loading">
+        {{ loading ? '...' : '确认' }}
+      </button>
     </div>
+    <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
   </div>
 </template>
 
@@ -25,16 +29,28 @@ import { addRecord } from '../utils/storage';
 const emit = defineEmits(['recorded']);
 const showNote = ref(false);
 const note = ref('');
+const loading = ref(false);
+const errorMsg = ref('');
 
 function handleClick() {
   showNote.value = true;
+  errorMsg.value = '';
 }
 
-function confirmNote() {
-  addRecord(note.value);
-  note.value = '';
-  showNote.value = false;
-  emit('recorded');
+async function confirmNote() {
+  loading.value = true;
+  errorMsg.value = '';
+  try {
+    await addRecord(note.value);
+    note.value = '';
+    showNote.value = false;
+    emit('recorded');
+  } catch (e) {
+    console.error('保存失败:', e);
+    errorMsg.value = '保存失败，请重试';
+  } finally {
+    loading.value = false;
+  }
 }
 </script>
 
@@ -117,5 +133,17 @@ function confirmNote() {
 
 .confirm-btn:hover {
   background: #6B3410;
+}
+
+.record-btn:disabled,
+.confirm-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  color: #e53935;
+  font-size: 13px;
+  margin: 0;
 }
 </style>

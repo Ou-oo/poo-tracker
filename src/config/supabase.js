@@ -5,9 +5,9 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseAvailable = !!(
   supabaseUrl &&
-  supabaseUrl !== 'your_supabase_project_url' &&
+  supabaseUrl.includes('supabase.co') &&
   supabaseAnonKey &&
-  supabaseAnonKey !== 'your_supabase_anon_key'
+  supabaseAnonKey.length > 20
 );
 
 export const supabase = isSupabaseAvailable
