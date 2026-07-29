@@ -18,7 +18,8 @@ const weekStats = ref({
 });
 const allUserStats = ref([]);
 const viewMode = ref('mine');
-const loading = ref(true);
+const initialLoading = ref(true);
+const refreshing = ref(false);
 
 const myTodayRecords = computed(() => 
   todayRecords.value.filter(r => r.nickname === currentNickname.value)
@@ -45,8 +46,7 @@ const myWeekStats = computed(() => {
   return stats;
 });
 
-async function refreshData() {
-  loading.value = true;
+async function loadData() {
   currentNickname.value = ensureNickname();
   try {
     const [today, week, allUsers] = await Promise.all([
@@ -59,28 +59,35 @@ async function refreshData() {
     allUserStats.value = allUsers;
   } catch (e) {
     console.error('加载数据失败:', e);
-  } finally {
-    loading.value = false;
   }
 }
 
+async function handleRecorded() {
+  refreshing.value = true;
+  await loadData();
+  refreshing.value = false;
+}
+
 async function handleDelete(id) {
+  refreshing.value = true;
   await deleteRecord(id);
-  await refreshData();
+  await loadData();
+  refreshing.value = false;
 }
 
 function handleNicknameChange(newName) {
   setNickname(newName);
   currentNickname.value = newName;
-  refreshData();
+  loadData();
 }
 
 function toggleView() {
   viewMode.value = viewMode.value === 'mine' ? 'all' : 'mine';
 }
 
-onMounted(() => {
-  refreshData();
+onMounted(async () => {
+  await loadData();
+  initialLoading.value = false;
 });
 </script>
 
@@ -96,8 +103,12 @@ onMounted(() => {
       @change="handleNicknameChange" 
     />
 
-    <main v-if="!loading" class="app-main">
-      <QuickRecord @recorded="refreshData" />
+    <div v-if="initialLoading" class="loading">
+      <p>加载中...</p>
+    </div>
+
+    <main v-else class="app-main">
+      <QuickRecord @recorded="handleRecorded" :disabled="refreshing" />
 
       <div class="view-toggle" v-if="allUserStats.length > 0">
         <button 
@@ -138,11 +149,12 @@ onMounted(() => {
           :show-nickname="true"
         />
       </template>
-    </main>
 
-    <div v-else class="loading">
-      <p>加载中...</p>
-    </div>
+      <div v-if="refreshing" class="refreshing-indicator">
+        <span class="spinner"></span>
+        <span>正在同步数据...</span>
+      </div>
+    </main>
 
     <footer class="app-footer">
       <p>数据保存在云端，可多人共享查看</p>
@@ -211,6 +223,36 @@ onMounted(() => {
   text-align: center;
   padding: 60px 20px;
   color: #999;
+}
+
+.refreshing-indicator {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(139, 69, 19, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 999;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .app-footer {

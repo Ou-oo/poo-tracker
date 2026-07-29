@@ -1,6 +1,6 @@
 <template>
   <div class="quick-record">
-    <button class="record-btn" :disabled="loading" @click="handleClick">
+    <button class="record-btn" :disabled="loading || disabled" @click="handleClick">
       <span class="btn-icon">{{ loading ? '⏳' : '💩' }}</span>
       <span class="btn-text">{{ loading ? '保存中...' : '记录一次' }}</span>
     </button>
@@ -12,9 +12,9 @@
         placeholder="添加备注（可选）"
         @keyup.enter="confirmNote"
         autofocus
-        :disabled="loading"
+        :disabled="loading || disabled"
       />
-      <button class="confirm-btn" @click="confirmNote" :disabled="loading">
+      <button class="confirm-btn" @click="confirmNote" :disabled="loading || disabled">
         {{ loading ? '...' : '确认' }}
       </button>
     </div>
@@ -23,8 +23,15 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { addRecord } from '../utils/storage';
+
+const props = defineProps({
+  disabled: {
+    type: Boolean,
+    default: false
+  }
+});
 
 const emit = defineEmits(['recorded']);
 const showNote = ref(false);
@@ -33,6 +40,7 @@ const loading = ref(false);
 const errorMsg = ref('');
 
 function handleClick() {
+  if (props.disabled) return;
   showNote.value = true;
   errorMsg.value = '';
 }
