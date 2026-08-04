@@ -102,6 +102,16 @@ export async function deleteRecord(id) {
   }
 }
 
+export async function getRecordsByDate(dateStr, nickname = null) {
+  const records = await fetchAllRecords();
+  return records
+    .filter(r => {
+      if (nickname && r.nickname !== nickname) return false;
+      return r.timestamp.split('T')[0] === dateStr;
+    })
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
 export async function getTodayRecords(nickname = null) {
   const records = await fetchAllRecords();
   const today = new Date();

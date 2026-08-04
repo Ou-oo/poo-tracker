@@ -1,10 +1,10 @@
 <template>
   <div class="record-list">
-    <h3 class="list-title">📋 今日记录</h3>
+    <h3 class="list-title">{{ title }}</h3>
     <div v-if="records.length === 0" class="empty-state">
       <span class="empty-icon">😐</span>
-      <p>今天还没有记录哦</p>
-      <p class="empty-hint">点击上方按钮记录第一次吧</p>
+      <p>还没有记录哦</p>
+      <p v-if="title === '📋 今日记录'" class="empty-hint">点击上方按钮记录第一次吧</p>
     </div>
     <ul v-else class="records">
       <li v-for="record in records" :key="record.id" class="record-item">
@@ -36,6 +36,10 @@ const props = defineProps({
   showNickname: {
     type: Boolean,
     default: false
+  },
+  title: {
+    type: String,
+    default: '📋 今日记录'
   }
 });
 

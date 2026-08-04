@@ -5,7 +5,7 @@ import RecordList from './components/RecordList.vue';
 import StatsCard from './components/StatsCard.vue';
 import UserHeader from './components/UserHeader.vue';
 import AllUsersStats from './components/AllUsersStats.vue';
-import { getTodayRecords, getWeekStats, deleteRecord, getAllUserStats } from './utils/storage';
+import { getTodayRecords, getWeekStats, deleteRecord, getAllUserStats, getRecordsByDate } from './utils/storage';
 import { ensureNickname, getNickname, setNickname } from './utils/user';
 
 const currentNickname = ref('');
@@ -17,9 +17,18 @@ const weekStats = ref({
   daysTracked: 0
 });
 const allUserStats = ref([]);
+const myWeekStatsData = ref({
+  dailyCounts: {},
+  totalCount: 0,
+  avgPerDay: '0.0',
+  daysTracked: 0
+});
 const viewMode = ref('mine');
 const initialLoading = ref(true);
 const refreshing = ref(false);
+const selectedDate = ref(null);
+const selectedDateRecords = ref([]);
+const loadingHistory = ref(false);
 
 const myTodayRecords = computed(() => 
   todayRecords.value.filter(r => r.nickname === currentNickname.value)
@@ -29,37 +38,48 @@ const myWeekStats = computed(() => {
   if (viewMode.value === 'all') {
     return weekStats.value;
   }
-  const stats = { ...weekStats.value };
-  let myTotal = 0;
-  const myDailyCounts = {};
-  Object.entries(weekStats.value.dailyCounts).forEach(([date, count]) => {
-    const myCount = todayRecords.value.filter(r => 
-      r.nickname === currentNickname.value && r.timestamp.split('T')[0] === date
-    ).length;
-    myDailyCounts[date] = myCount;
-    myTotal += myCount;
-  });
-  stats.dailyCounts = myDailyCounts;
-  stats.totalCount = myTotal;
-  const activeDays = Object.values(myDailyCounts).filter(v => v > 0).length || 1;
-  stats.avgPerDay = (myTotal / activeDays).toFixed(1);
-  return stats;
+  return myWeekStatsData.value;
 });
 
 async function loadData() {
   currentNickname.value = ensureNickname();
   try {
-    const [today, week, allUsers] = await Promise.all([
+    const [today, week, allUsers, myWeek] = await Promise.all([
       getTodayRecords(),
       getWeekStats(),
-      getAllUserStats()
+      getAllUserStats(),
+      getWeekStats(currentNickname.value)
     ]);
     todayRecords.value = today;
     weekStats.value = week;
     allUserStats.value = allUsers;
+    myWeekStatsData.value = myWeek;
   } catch (e) {
     console.error('加载数据失败:', e);
   }
+}
+
+async function handleSelectDate(date) {
+  selectedDate.value = date;
+  loadingHistory.value = true;
+  try {
+    selectedDateRecords.value = await getRecordsByDate(date, currentNickname.value);
+  } catch (e) {
+    console.error('加载历史记录失败:', e);
+    selectedDateRecords.value = [];
+  }
+  loadingHistory.value = false;
+}
+
+function closeHistoryModal() {
+  selectedDate.value = null;
+  selectedDateRecords.value = [];
+}
+
+function formatHistoryDate(dateStr) {
+  const d = new Date(dateStr);
+  const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${dayNames[d.getDay()]}`;
 }
 
 async function handleRecorded() {
@@ -132,6 +152,7 @@ onMounted(async () => {
           :today-count="myTodayRecords.length" 
           :week-stats="myWeekStats" 
           :is-mine="true"
+          @select-date="handleSelectDate"
         />
         <RecordList 
           :records="myTodayRecords" 
@@ -159,6 +180,25 @@ onMounted(async () => {
     <footer class="app-footer">
       <p>数据保存在云端，可多人共享查看</p>
     </footer>
+
+    <div v-if="selectedDate" class="history-modal-overlay" @click.self="closeHistoryModal">
+      <div class="history-modal">
+        <div class="history-modal-header">
+          <h3 class="history-modal-title">📅 {{ formatHistoryDate(selectedDate) }}</h3>
+          <button class="history-modal-close" @click="closeHistoryModal">✕</button>
+        </div>
+        <div v-if="loadingHistory" class="history-loading">
+          <span class="spinner"></span>
+          <span>加载中...</span>
+        </div>
+        <RecordList
+          v-else
+          :records="selectedDateRecords"
+          :show-delete="false"
+          :title="`📋 ${formatHistoryDate(selectedDate)} 的记录`"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -260,5 +300,91 @@ onMounted(async () => {
   padding: 20px;
   font-size: 12px;
   color: #aaa;
+}
+
+.history-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.history-modal {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 440px;
+  width: 100%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: modalIn 0.2s ease;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.history-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.history-modal-title {
+  margin: 0;
+  font-size: 17px;
+  color: #333;
+}
+
+.history-modal-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.history-modal-close:hover {
+  background: #e0e0e0;
+}
+
+.history-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.history-loading .spinner {
+  border-color: rgba(139, 69, 19, 0.3);
+  border-top-color: #8B4513;
 }
 </style>

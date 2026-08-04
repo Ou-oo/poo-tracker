@@ -25,9 +25,9 @@
     </div>
 
     <div class="week-chart">
-      <h4 class="chart-title">📊 近7天趋势</h4>
+      <h4 class="chart-title">📊 近7天趋势 <span class="chart-hint">点击查看历史</span></h4>
       <div class="bars">
-        <div v-for="(count, date) in weekStats.dailyCounts" :key="date" class="bar-wrapper">
+        <div v-for="(count, date) in weekStats.dailyCounts" :key="date" class="bar-wrapper" @click="$emit('select-date', date)">
           <div class="bar-container">
             <div
               class="bar"
@@ -66,6 +66,8 @@ const props = defineProps({
     default: true
   }
 });
+
+defineEmits(['select-date']);
 
 const today = new Date().toISOString().split('T')[0];
 
@@ -200,6 +202,15 @@ function formatLabel(date) {
   margin: 0 0 16px 0;
   font-size: 15px;
   color: #333;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-hint {
+  font-size: 11px;
+  color: #aaa;
+  font-weight: normal;
 }
 
 .bars {
@@ -216,6 +227,16 @@ function formatLabel(date) {
   flex-direction: column;
   align-items: center;
   height: 100%;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.bar-wrapper:hover {
+  transform: translateY(-2px);
+}
+
+.bar-wrapper:hover .bar-label {
+  color: #8B4513;
 }
 
 .bar-container {
