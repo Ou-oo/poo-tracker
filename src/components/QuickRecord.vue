@@ -105,13 +105,13 @@ async function confirmRecord() {
   errorMsg.value = '';
   try {
     await addRecord(note.value, mood.value);
+    loading.value = false;
     closeForm();
     emit('recorded');
   } catch (e) {
+    loading.value = false;
     console.error('保存失败:', e);
     errorMsg.value = '保存失败，请重试';
-  } finally {
-    loading.value = false;
   }
 }
 </script>
