@@ -24,6 +24,7 @@ export async function fetchAllRecords() {
         id: r.id,
         timestamp: r.created_at,
         note: r.note || '',
+        mood: r.mood || '',
         nickname: r.user_nickname
       }));
     } catch (e) {
@@ -35,13 +36,13 @@ export async function fetchAllRecords() {
   }
 }
 
-export async function addRecord(note = '') {
+export async function addRecord(note = '', mood = '') {
   const nickname = ensureNickname();
   if (isSupabaseAvailable) {
     try {
       const { data, error } = await supabase
         .from('poo_records')
-        .insert([{ user_nickname: nickname, note }])
+        .insert([{ user_nickname: nickname, note, mood }])
         .select();
       if (error) throw error;
       const record = data[0];
@@ -49,6 +50,7 @@ export async function addRecord(note = '') {
         id: record.id,
         timestamp: record.created_at,
         note: record.note || '',
+        mood: record.mood || '',
         nickname: record.user_nickname
       };
     } catch (e) {
@@ -58,6 +60,7 @@ export async function addRecord(note = '') {
         id: Date.now(),
         timestamp: new Date().toISOString(),
         note,
+        mood,
         nickname
       };
       records.push(newRecord);
@@ -70,6 +73,7 @@ export async function addRecord(note = '') {
       id: Date.now(),
       timestamp: new Date().toISOString(),
       note,
+      mood,
       nickname
     };
     records.push(newRecord);

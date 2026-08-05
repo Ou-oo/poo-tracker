@@ -11,6 +11,7 @@
         <div class="record-info">
           <div class="record-meta">
             <span class="record-time">{{ formatTime(record.timestamp) }}</span>
+            <span v-if="record.mood" class="record-mood" :class="'mood-' + getMoodClass(record.mood)">{{ getMoodLabel(record.mood) }}</span>
             <span v-if="showNickname && record.nickname" class="record-user">{{ record.nickname }}</span>
           </div>
           <span v-if="record.note" class="record-note">{{ record.note }}</span>
@@ -57,6 +58,25 @@ function handleDelete(id) {
   if (confirm('确定要删除这条记录吗？')) {
     emit('delete', id);
   }
+}
+
+const moodMap = {
+  '顺利': { label: '🌊 一泻千里', cls: 'good' },
+  '正常': { label: '😊 轻松顺畅', cls: 'good' },
+  '偏多': { label: '🍽️ 意犹未尽', cls: 'ok' },
+  '费力': { label: '💪 费了老大劲', cls: 'warn' },
+  '便秘': { label: '🔥 艰难困苦', cls: 'bad' },
+  '腹泻': { label: '💦 一泻千里止不住', cls: 'bad' },
+  '舒适': { label: '👑 王者归来', cls: 'good' },
+  '奇怪': { label: '🤔 形状奇怪', cls: 'warn' }
+};
+
+function getMoodLabel(mood) {
+  return moodMap[mood]?.label || mood;
+}
+
+function getMoodClass(mood) {
+  return moodMap[mood]?.cls || 'ok';
 }
 </script>
 
@@ -137,6 +157,33 @@ function handleDelete(id) {
   background: #fff3e0;
   padding: 2px 8px;
   border-radius: 10px;
+}
+
+.record-mood {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.record-mood.mood-good {
+  color: #2e7d32;
+  background: #e8f5e9;
+}
+
+.record-mood.mood-ok {
+  color: #1565c0;
+  background: #e3f2fd;
+}
+
+.record-mood.mood-warn {
+  color: #e65100;
+  background: #fff3e0;
+}
+
+.record-mood.mood-bad {
+  color: #c62828;
+  background: #ffebee;
 }
 
 .record-note {

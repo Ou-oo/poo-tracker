@@ -5,8 +5,12 @@ CREATE TABLE IF NOT EXISTS poo_records (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   user_nickname TEXT NOT NULL DEFAULT '匿名',
-  note TEXT DEFAULT ''
+  note TEXT DEFAULT '',
+  mood TEXT DEFAULT ''
 );
+
+-- 1.1 为已有表添加 mood 列（如果不存在）
+ALTER TABLE poo_records ADD COLUMN IF NOT EXISTS mood TEXT DEFAULT '';
 
 -- 2. 创建索引（如果不存在）
 CREATE INDEX IF NOT EXISTS idx_poo_records_created_at ON poo_records (created_at DESC);
