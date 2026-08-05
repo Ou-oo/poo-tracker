@@ -1,7 +1,13 @@
 <template>
   <div class="quick-record">
     <button class="record-btn" :disabled="loading || disabled" @click="handleClick">
-      <span class="btn-icon">{{ loading ? '⏳' : '💩' }}</span>
+      <span class="btn-icon" v-if="!loading">
+        <span class="cool-poo">
+          <span class="poo-emoji">💩</span>
+          <span class="poo-sunglasses">🕶️</span>
+        </span>
+      </span>
+      <span class="btn-icon" v-else>⏳</span>
       <span class="btn-text">{{ loading ? '保存中...' : '记录一次' }}</span>
     </button>
 
@@ -151,6 +157,27 @@ async function confirmRecord() {
 .btn-icon {
   font-size: 42px;
   line-height: 1;
+  position: relative;
+}
+
+.cool-poo {
+  position: relative;
+  display: inline-block;
+}
+
+.cool-poo .poo-emoji {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.cool-poo .poo-sunglasses {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 16px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.3));
 }
 
 .btn-text {
