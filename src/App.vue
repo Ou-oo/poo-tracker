@@ -30,6 +30,31 @@ const selectedDate = ref(null);
 const selectedDateRecords = ref([]);
 const loadingHistory = ref(false);
 
+const funFacts = [
+  '💡 每天排便1-3次都是正常的，不必焦虑',
+  '💡 大便在肠道里约停留12-48小时',
+  '💡 多喝水能有效预防便秘，每天至少8杯水',
+  '💡 膳食纤维能让大便更通畅，多吃蔬菜水果',
+  '💡 蹲便姿势比坐便更符合人体工学',
+  '💡 大便颜色异常可能是健康预警，要留意',
+  '💡 肠道是人体第二大脑，健康肠道影响情绪',
+  '💡 每天约有100万亿个细菌在肠道内帮你工作',
+  '💡 运动能促进肠道蠕动，帮助顺利排便',
+  '💡 憋便会导致毒素重吸收，有便意别忍',
+  '💡 便便的形状反映肠道健康，香蕉形最佳',
+  '💡 吃益生菌可以改善肠道菌群平衡',
+  '💡 腹部按摩能缓解便秘，顺时针方向轻柔打圈',
+  '💡 乳糖不耐受的人喝牛奶可能会导致腹泻',
+  '💡 排便时间最好在早上起床后或早餐后'
+];
+
+const currentFunFact = ref('');
+
+function pickRandomFunFact() {
+  const idx = Math.floor(Math.random() * funFacts.length);
+  currentFunFact.value = funFacts[idx];
+}
+
 const myTodayRecords = computed(() => 
   todayRecords.value.filter(r => r.nickname === currentNickname.value)
 );
@@ -106,6 +131,7 @@ function toggleView() {
 }
 
 onMounted(async () => {
+  pickRandomFunFact();
   await loadData();
   initialLoading.value = false;
 });
@@ -115,7 +141,7 @@ onMounted(async () => {
   <div class="app">
     <header class="app-header">
       <h1 class="app-title">💩 便便日记</h1>
-      <p class="app-subtitle">关注肠道健康，从记录开始</p>
+      <p class="app-subtitle">{{ currentFunFact }}</p>
     </header>
 
     <UserHeader 
