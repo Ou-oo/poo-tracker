@@ -221,3 +221,136 @@ export async function deleteTestRecords() {
   }
   return false;
 }
+
+// ========== 互动功能（点赞/收藏/评论/疑问） ==========
+
+const INTERACTION_LOCAL_KEY = 'poo_interactions_local';
+
+function getLocalInteractions() {
+  const data = localStorage.getItem(INTERACTION_LOCAL_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+function saveLocalInteractions(records) {
+  localStorage.setItem(INTERACTION_LOCAL_KEY, JSON.stringify(records));
+}
+
+export async function addInteraction(recordId, toUser, type, content = '') {
+  const fromUser = ensureNickname();
+  if (isSupabaseAvailable) {
+    try {
+      const { data, error } = await supabase
+        .from('poo_interactions')
+        .insert([{ record_id: recordId, from_user: fromUser, to_user: toUser, type, content }])
+        .select();
+      if (error) throw error;
+      return {
+        id: data[0].id,
+        recordId: data[0].record_id,
+        fromUser: data[0].from_user,
+        toUser: data[0].to_user,
+        type: data[0].type,
+        content: data[0].content || '',
+        timestamp: data[0].created_at,
+        isRead: data[0].is_read
+      };
+    } catch (e) {
+      console.warn('Supabase 互动写入失败:', e.message);
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function getInteractionsForRecord(recordId) {
+  if (isSupabaseAvailable) {
+    try {
+      const { data, error } = await supabase
+        .from('poo_interactions')
+        .select('*')
+        .eq('record_id', recordId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data.map(i => ({
+        id: i.id,
+        recordId: i.record_id,
+        fromUser: i.from_user,
+        toUser: i.to_user,
+        type: i.type,
+        content: i.content || '',
+        timestamp: i.created_at,
+        isRead: i.is_read
+      }));
+    } catch (e) {
+      console.warn('获取互动失败:', e.message);
+      return [];
+    }
+  }
+  return getLocalInteractions().filter(i => i.recordId === recordId);
+}
+
+export async function getNotifications(nickname) {
+  if (isSupabaseAvailable) {
+    try {
+      const { data, error } = await supabase
+        .from('poo_interactions')
+        .select('*')
+        .eq('to_user', nickname)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data.map(i => ({
+        id: i.id,
+        recordId: i.record_id,
+        fromUser: i.from_user,
+        toUser: i.to_user,
+        type: i.type,
+        content: i.content || '',
+        timestamp: i.created_at,
+        isRead: i.is_read
+      }));
+    } catch (e) {
+      console.warn('获取通知失败:', e.message);
+      return [];
+    }
+  }
+  return getLocalInteractions().filter(i => i.toUser === nickname);
+}
+
+export async function getUnreadCount(nickname) {
+  if (isSupabaseAvailable) {
+    try {
+      const { count, error } = await supabase
+        .from('poo_interactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('to_user', nickname)
+        .eq('is_read', false);
+      if (error) throw error;
+      return count || 0;
+    } catch (e) {
+      console.warn('获取未读数失败:', e.message);
+      return 0;
+    }
+  }
+  return getLocalInteractions().filter(i => i.toUser === nickname && !i.isRead).length;
+}
+
+export async function markAllRead(nickname) {
+  if (isSupabaseAvailable) {
+    try {
+      const { error } = await supabase
+        .from('poo_interactions')
+        .update({ is_read: true })
+        .eq('to_user', nickname)
+        .eq('is_read', false);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('标记已读失败:', e.message);
+      return false;
+    }
+  }
+  const records = getLocalInteractions();
+  records.forEach(i => { if (i.toUser === nickname) i.isRead = true; });
+  saveLocalInteractions(records);
+  return true;
+}

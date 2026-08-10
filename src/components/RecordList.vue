@@ -8,7 +8,7 @@
     </div>
     <template v-else>
       <ul class="records">
-        <li v-for="record in displayedRecords" :key="record.id" class="record-item">
+        <li v-for="record in displayedRecords" :key="record.id" class="record-item" :class="{ 'has-interactions': showInteractions }">
           <div class="record-info">
             <div class="record-meta">
               <span class="record-time">{{ formatTime(record.timestamp) }}</span>
@@ -16,6 +16,39 @@
               <span v-if="showNickname && record.nickname" class="record-user">{{ record.nickname }}</span>
             </div>
             <span v-if="record.note" class="record-note">{{ record.note }}</span>
+            <!-- 互动按钮 -->
+            <div v-if="showInteractions" class="interaction-bar">
+              <button class="interaction-btn" :class="{ active: hasInteracted(record.id, 'like') }" @click="handleInteraction(record, 'like')" title="点赞">
+                {{ hasInteracted(record.id, 'like') ? '❤️' : '🤍' }} {{ getCount(record.id, 'like') }}
+              </button>
+              <button class="interaction-btn" :class="{ active: hasInteracted(record.id, 'favorite') }" @click="handleInteraction(record, 'favorite')" title="收藏">
+                {{ hasInteracted(record.id, 'favorite') ? '⭐' : '☆' }} {{ getCount(record.id, 'favorite') }}
+              </button>
+              <button class="interaction-btn" @click="toggleComment(record.id)" title="评论">
+                💬 {{ getCount(record.id, 'comment') }}
+              </button>
+              <button class="interaction-btn" @click="handleInteraction(record, 'question')" title="疑问">
+                ❓ {{ getCount(record.id, 'question') }}
+              </button>
+            </div>
+            <!-- 评论展开区 -->
+            <div v-if="showInteractions && commentingId === record.id" class="comment-area">
+              <input
+                v-model="commentText"
+                class="comment-input"
+                placeholder="说点什么..."
+                @keyup.enter="submitComment(record)"
+                maxlength="100"
+              />
+              <button class="comment-submit" @click="submitComment(record)">发送</button>
+            </div>
+            <!-- 已有评论列表 -->
+            <div v-if="showInteractions && getComments(record.id).length > 0" class="comment-list">
+              <div v-for="c in getComments(record.id)" :key="c.id" class="comment-item">
+                <span class="comment-user">{{ c.fromUser }}</span>
+                <span class="comment-content">{{ c.content }}</span>
+              </div>
+            </div>
           </div>
           <button v-if="showDelete" class="delete-btn" @click="handleDelete(record.id)" title="删除">
             ✕
@@ -30,7 +63,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
+import { addInteraction, getInteractionsForRecord } from '../utils/storage';
+import { ensureNickname } from '../utils/user';
 
 const props = defineProps({
   records: {
@@ -52,12 +87,20 @@ const props = defineProps({
   showDate: {
     type: Boolean,
     default: false
+  },
+  showInteractions: {
+    type: Boolean,
+    default: false
   }
 });
 
-const emit = defineEmits(['delete']);
+const emit = defineEmits(['delete', 'interacted']);
 
 const collapsed = ref(true);
+const interactionsMap = ref({});
+const commentingId = ref(null);
+const commentText = ref('');
+const myNickname = ensureNickname();
 
 const displayedRecords = computed(() => {
   if (collapsed.value && props.records.length > 10) {
@@ -65,6 +108,77 @@ const displayedRecords = computed(() => {
   }
   return props.records;
 });
+
+// 加载互动数据
+async function loadInteractions(recordIds) {
+  for (const id of recordIds) {
+    if (!interactionsMap.value[id]) {
+      const data = await getInteractionsForRecord(id);
+      interactionsMap.value[id] = data;
+    }
+  }
+}
+
+watch(() => props.records, (newRecords) => {
+  if (props.showInteractions && newRecords.length > 0) {
+    interactionsMap.value = {};
+    loadInteractions(newRecords.map(r => r.id));
+  }
+}, { immediate: true });
+
+function hasInteracted(recordId, type) {
+  const list = interactionsMap.value[recordId] || [];
+  return list.some(i => i.fromUser === myNickname && i.type === type);
+}
+
+function getCount(recordId, type) {
+  const list = interactionsMap.value[recordId] || [];
+  const filtered = list.filter(i => i.type === type);
+  return filtered.length || '';
+}
+
+function getComments(recordId) {
+  const list = interactionsMap.value[recordId] || [];
+  return list.filter(i => i.type === 'comment' && i.content);
+}
+
+async function handleInteraction(record, type) {
+  // 点赞/收藏可以取消
+  if (hasInteracted(record.id, type)) {
+    return; // 已操作过，不再重复
+  }
+  const result = await addInteraction(record.id, record.nickname, type);
+  if (result) {
+    if (!interactionsMap.value[record.id]) {
+      interactionsMap.value[record.id] = [];
+    }
+    interactionsMap.value[record.id].unshift(result);
+    emit('interacted', { record, type, result });
+  }
+}
+
+function toggleComment(recordId) {
+  if (commentingId.value === recordId) {
+    commentingId.value = null;
+  } else {
+    commentingId.value = recordId;
+    commentText.value = '';
+  }
+}
+
+async function submitComment(record) {
+  if (!commentText.value.trim()) return;
+  const result = await addInteraction(record.id, record.nickname, 'comment', commentText.value.trim());
+  if (result) {
+    if (!interactionsMap.value[record.id]) {
+      interactionsMap.value[record.id] = [];
+    }
+    interactionsMap.value[record.id].unshift(result);
+    emit('interacted', { record, type: 'comment', result });
+  }
+  commentText.value = '';
+  commentingId.value = null;
+}
 
 function formatTime(timestamp) {
   const date = new Date(timestamp);
@@ -255,5 +369,101 @@ function getMoodClass(mood) {
 
 .toggle-more-btn:hover {
   background: #ffe0b2;
+}
+
+/* 互动功能样式 */
+.record-item.has-interactions {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.interaction-bar {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.interaction-btn {
+  border: 1px solid #e0e0e0;
+  background: white;
+  border-radius: 16px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #666;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.interaction-btn:hover {
+  border-color: #8B4513;
+  color: #8B4513;
+}
+
+.interaction-btn.active {
+  background: #fff3e0;
+  border-color: #8B4513;
+  color: #8B4513;
+}
+
+.comment-area {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.comment-input {
+  flex: 1;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 13px;
+  outline: none;
+}
+
+.comment-input:focus {
+  border-color: #8B4513;
+}
+
+.comment-submit {
+  border: none;
+  background: #8B4513;
+  color: white;
+  border-radius: 8px;
+  padding: 5px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.comment-submit:hover {
+  background: #A0522D;
+}
+
+.comment-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comment-item {
+  font-size: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+
+.comment-user {
+  font-weight: 600;
+  color: #8B4513;
+  margin-right: 6px;
+}
+
+.comment-content {
+  color: #555;
 }
 </style>

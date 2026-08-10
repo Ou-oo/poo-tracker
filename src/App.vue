@@ -5,7 +5,7 @@ import RecordList from './components/RecordList.vue';
 import StatsCard from './components/StatsCard.vue';
 import UserHeader from './components/UserHeader.vue';
 import AllUsersStats from './components/AllUsersStats.vue';
-import { getTodayRecords, getWeekStats, deleteRecord, getAllUserStats, getRecordsByDate, fetchAllRecords, deleteTestRecords } from './utils/storage';
+import { getTodayRecords, getWeekStats, deleteRecord, getAllUserStats, getRecordsByDate, fetchAllRecords, deleteTestRecords, getNotifications, getUnreadCount, markAllRead } from './utils/storage';
 import { ensureNickname, getNickname, setNickname } from './utils/user';
 import { computeAchievements, getNewAchievements, ACHIEVEMENTS } from './utils/achievements';
 
@@ -39,6 +39,10 @@ const alreadyUnlockedIds = new Set();
 const selectedFriend = ref(null);
 const friendRecords = ref([]);
 const cleaningTest = ref(false);
+const unreadCount = ref(0);
+const showNotifications = ref(false);
+const notifications = ref([]);
+const notificationToast = ref(null);
 
 const funFacts = [
   '热知识：每天排便1-3次都是正常的，不必焦虑',
@@ -210,13 +214,89 @@ onMounted(async () => {
   pickRandomFunFact();
   await loadData();
   initialLoading.value = false;
+  await loadNotifications();
+  // 每30秒轮询新通知
+  setInterval(loadNotifications, 30000);
 });
+
+async function loadNotifications() {
+  const nickname = getNickname();
+  if (!nickname) return;
+  const [count, list] = await Promise.all([
+    getUnreadCount(nickname),
+    getNotifications(nickname)
+  ]);
+  // 检测新通知（之前没有的）
+  const prevIds = new Set(notifications.value.map(n => n.id));
+  const newOnes = list.filter(n => !prevIds.has(n.id) && !n.isRead);
+  unreadCount.value = count;
+  notifications.value = list;
+  // 弹窗提示新通知
+  if (newOnes.length > 0 && prevIds.size > 0) {
+    showNotificationToast(newOnes[0]);
+  }
+}
+
+function showNotificationToast(n) {
+  const typeMap = {
+    like: { icon: '❤️', text: '点赞了你的记录' },
+    favorite: { icon: '⭐', text: '收藏了你的记录' },
+    comment: { icon: '💬', text: '评论了你的记录' },
+    question: { icon: '❓', text: '对你的记录有疑问' }
+  };
+  const info = typeMap[n.type] || { icon: '🔔', text: '给你发了一条通知' };
+  notificationToast.value = {
+    from: n.fromUser,
+    text: info.text,
+    icon: info.icon,
+    content: n.content,
+    show: true
+  };
+  setTimeout(() => {
+    if (notificationToast.value) notificationToast.value.show = false;
+    setTimeout(() => { notificationToast.value = null; }, 400);
+  }, 4000);
+}
+
+async function handleOpenNotifications() {
+  showNotifications.value = true;
+  const nickname = getNickname();
+  if (nickname && unreadCount.value > 0) {
+    await markAllRead(nickname);
+    unreadCount.value = 0;
+  }
+}
+
+function closeNotifications() {
+  showNotifications.value = false;
+}
+
+function onInteracted() {
+  // 互动后刷新通知
+  loadNotifications();
+}
+
+function formatNotificationTime(timestamp) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  const diff = now - date;
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
+  return `${date.getMonth() + 1}/${date.getDate()}`;
+}
 </script>
 
 <template>
   <div class="app">
     <header class="app-header">
-      <h1 class="app-title">💩 便便日记</h1>
+      <div class="header-row">
+        <h1 class="app-title">💩 便便日记</h1>
+        <button class="notification-bell" @click="handleOpenNotifications" title="通知">
+          🔔
+          <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+        </button>
+      </div>
       <p class="app-subtitle">{{ currentFunFact }}</p>
     </header>
 
@@ -370,8 +450,48 @@ onMounted(async () => {
           :show-delete="false"
           :show-nickname="false"
           :show-date="true"
+          :show-interactions="true"
           :title="`📋 近期记录（共${friendRecords.length}条）`"
+          @interacted="onInteracted"
         />
+      </div>
+    </div>
+
+    <!-- 通知列表弹窗 -->
+    <div v-if="showNotifications" class="history-modal-overlay" @click.self="closeNotifications">
+      <div class="history-modal">
+        <div class="history-modal-header">
+          <h3 class="history-modal-title">🔔 通知中心</h3>
+          <button class="history-modal-close" @click="closeNotifications">✕</button>
+        </div>
+        <div class="notifications-list">
+          <div v-if="notifications.length === 0" class="empty-notifications">
+            <span style="font-size: 36px;">🔕</span>
+            <p>暂无通知</p>
+          </div>
+          <div v-for="n in notifications" :key="n.id" class="notification-item" :class="{ unread: !n.isRead }">
+            <span class="notification-icon">{{ { like: '❤️', favorite: '⭐', comment: '💬', question: '❓' }[n.type] || '🔔' }}</span>
+            <div class="notification-content">
+              <div class="notification-text">
+                <span class="notification-from">{{ n.fromUser }}</span>
+                {{ { like: '点赞了你的记录', favorite: '收藏了你的记录', comment: '评论了你的记录', question: '对你的记录有疑问' }[n.type] || '给你发了一条通知' }}
+              </div>
+              <div v-if="n.content" class="notification-comment">"{{ n.content }}"</div>
+              <div class="notification-time">{{ formatNotificationTime(n.timestamp) }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 通知即时弹窗 -->
+    <div v-if="notificationToast" class="notification-toast" :class="{ show: notificationToast.show }">
+      <span class="notification-toast-icon">{{ notificationToast.icon }}</span>
+      <div class="notification-toast-body">
+        <div class="notification-toast-text">
+          <strong>{{ notificationToast.from }}</strong> {{ notificationToast.text }}
+        </div>
+        <div v-if="notificationToast.content" class="notification-toast-content">"{{ notificationToast.content }}"</div>
       </div>
     </div>
   </div>
@@ -388,10 +508,46 @@ onMounted(async () => {
   padding: 30px 20px 20px;
 }
 
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
 .app-title {
   margin: 0 0 8px 0;
   font-size: 28px;
   color: #333;
+}
+
+.notification-bell {
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  position: relative;
+  padding: 4px;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  background: #ff4444;
+  color: white;
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  font-weight: 600;
 }
 
 .app-subtitle {
@@ -815,5 +971,111 @@ onMounted(async () => {
 .achievement-item.unlocked .achievement-item-status {
   color: #8B4513;
   font-weight: 600;
+}
+
+/* 通知列表样式 */
+.notifications-list {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 10px 0;
+}
+
+.empty-notifications {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.notification-item {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  align-items: flex-start;
+}
+
+.notification-item.unread {
+  background: #fff8e1;
+}
+
+.notification-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-text {
+  font-size: 14px;
+  color: #333;
+}
+
+.notification-from {
+  font-weight: 600;
+  color: #8B4513;
+}
+
+.notification-comment {
+  font-size: 13px;
+  color: #666;
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-top: 4px;
+}
+
+.notification-time {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 4px;
+}
+
+/* 通知即时弹窗样式 */
+.notification-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  z-index: 3000;
+  max-width: 320px;
+  transform: translateX(400px);
+  opacity: 0;
+  transition: all 0.4s ease;
+}
+
+.notification-toast.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.notification-toast-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.notification-toast-body {
+  flex: 1;
+}
+
+.notification-toast-text {
+  font-size: 14px;
+  color: #333;
+}
+
+.notification-toast-content {
+  font-size: 13px;
+  color: #666;
+  margin-top: 4px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 4px 8px;
 }
 </style>

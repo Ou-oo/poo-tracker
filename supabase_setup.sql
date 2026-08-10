@@ -35,3 +35,41 @@ CREATE POLICY "允许所有人删除记录" ON poo_records
   FOR DELETE USING (true);
 
 -- 执行完毕后，刷新 Supabase Table Editor 确认 poo_records 表存在即可
+
+-- ============================================
+-- 互动表（点赞/收藏/评论/疑问 + 通知）
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS poo_interactions (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  record_id BIGINT NOT NULL,
+  from_user TEXT NOT NULL,
+  to_user TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'like',
+  content TEXT DEFAULT '',
+  is_read BOOLEAN DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_poo_interactions_to_user ON poo_interactions (to_user, is_read);
+CREATE INDEX IF NOT EXISTS idx_poo_interactions_record ON poo_interactions (record_id);
+
+ALTER TABLE poo_interactions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "允许所有人查看互动" ON poo_interactions;
+DROP POLICY IF EXISTS "允许所有人插入互动" ON poo_interactions;
+DROP POLICY IF EXISTS "允许所有人更新互动" ON poo_interactions;
+DROP POLICY IF EXISTS "允许所有人删除互动" ON poo_interactions;
+
+CREATE POLICY "允许所有人查看互动" ON poo_interactions
+  FOR SELECT USING (true);
+
+CREATE POLICY "允许所有人插入互动" ON poo_interactions
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "允许所有人更新互动" ON poo_interactions
+  FOR UPDATE USING (true);
+
+CREATE POLICY "允许所有人删除互动" ON poo_interactions
+  FOR DELETE USING (true);
+
