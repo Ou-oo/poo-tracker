@@ -9,12 +9,30 @@ export function setNickname(nickname) {
 }
 
 export function generateNickname() {
-  const emojis = ['🐻', '🐼', '🦊', '🐨', '🦁', '🐯', '🐸', '🐵', '🦄', '🐙', '🦋', '🌸', '🌈', '⭐'];
-  const animals = ['小熊', '熊猫', '狐狸', '考拉', '狮子', '老虎', '青蛙', '猴子', '独角兽', '章鱼'];
-  const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-  const randomAnimal = animals[Math.floor(Math.random() * animals.length)];
-  const randomNum = Math.floor(Math.random() * 90 + 10);
-  return `${randomEmoji}${randomAnimal}${randomNum}`;
+  const names = [
+    { emoji: '🐻', name: '小熊' },
+    { emoji: '🐼', name: '熊猫' },
+    { emoji: '🦊', name: '狐狸' },
+    { emoji: '🐨', name: '考拉' },
+    { emoji: '🦁', name: '狮子' },
+    { emoji: '🐯', name: '老虎' },
+    { emoji: '🐸', name: '青蛙' },
+    { emoji: '🐵', name: '猴子' },
+    { emoji: '🦄', name: '独角兽' },
+    { emoji: '🐙', name: '章鱼' },
+    { emoji: '🦋', name: '蝴蝶' },
+    { emoji: '🐰', name: '兔子' },
+    { emoji: '🐹', name: '仓鼠' },
+    { emoji: '🦉', name: '猫头鹰' },
+    { emoji: '🐳', name: '鲸鱼' },
+    { emoji: '🌸', name: '樱花' },
+    { emoji: '🌻', name: '向日葵' },
+    { emoji: '🌵', name: '仙人掌' },
+    { emoji: '🍀', name: '幸运草' },
+    { emoji: '🌷', name: '郁金香' }
+  ];
+  const pick = names[Math.floor(Math.random() * names.length)];
+  return `${pick.emoji}${pick.name}`;
 }
 
 export function ensureNickname() {
