@@ -204,3 +204,20 @@ export async function getAllUserStats() {
 export function isNormal(dayCount) {
   return dayCount >= 1 && dayCount <= 3;
 }
+
+export async function deleteTestRecords() {
+  if (isSupabaseAvailable) {
+    try {
+      const { error } = await supabase
+        .from('poo_records')
+        .delete()
+        .ilike('user_nickname', 'user%');
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.warn('删除测试数据失败:', e.message);
+      return false;
+    }
+  }
+  return false;
+}

@@ -6,25 +6,32 @@
       <p>还没有记录哦</p>
       <p v-if="title === '📋 今日记录'" class="empty-hint">点击上方按钮记录第一次吧</p>
     </div>
-    <ul v-else class="records">
-      <li v-for="record in records" :key="record.id" class="record-item">
-        <div class="record-info">
-          <div class="record-meta">
-            <span class="record-time">{{ formatTime(record.timestamp) }}</span>
-            <span v-if="record.mood" class="record-mood" :class="'mood-' + getMoodClass(record.mood)">{{ getMoodLabel(record.mood) }}</span>
-            <span v-if="showNickname && record.nickname" class="record-user">{{ record.nickname }}</span>
+    <template v-else>
+      <ul class="records">
+        <li v-for="record in displayedRecords" :key="record.id" class="record-item">
+          <div class="record-info">
+            <div class="record-meta">
+              <span class="record-time">{{ formatTime(record.timestamp) }}</span>
+              <span v-if="record.mood" class="record-mood" :class="'mood-' + getMoodClass(record.mood)">{{ getMoodLabel(record.mood) }}</span>
+              <span v-if="showNickname && record.nickname" class="record-user">{{ record.nickname }}</span>
+            </div>
+            <span v-if="record.note" class="record-note">{{ record.note }}</span>
           </div>
-          <span v-if="record.note" class="record-note">{{ record.note }}</span>
-        </div>
-        <button v-if="showDelete" class="delete-btn" @click="handleDelete(record.id)" title="删除">
-          ✕
-        </button>
-      </li>
-    </ul>
+          <button v-if="showDelete" class="delete-btn" @click="handleDelete(record.id)" title="删除">
+            ✕
+          </button>
+        </li>
+      </ul>
+      <button v-if="records.length > 10" class="toggle-more-btn" @click="collapsed = !collapsed">
+        {{ collapsed ? `展开更多（共${records.length}条）` : '收起' }}
+      </button>
+    </template>
   </div>
 </template>
 
 <script setup>
+import { ref, computed } from 'vue';
+
 const props = defineProps({
   records: {
     type: Array,
@@ -45,6 +52,15 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['delete']);
+
+const collapsed = ref(true);
+
+const displayedRecords = computed(() => {
+  if (collapsed.value && props.records.length > 10) {
+    return props.records.slice(0, 10);
+  }
+  return props.records;
+});
 
 function formatTime(timestamp) {
   const date = new Date(timestamp);
@@ -214,5 +230,23 @@ function getMoodClass(mood) {
 
 .delete-btn:hover {
   background: #ee5a5a;
+}
+
+.toggle-more-btn {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border: none;
+  background: #fff3e0;
+  color: #8B4513;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.toggle-more-btn:hover {
+  background: #ffe0b2;
 }
 </style>

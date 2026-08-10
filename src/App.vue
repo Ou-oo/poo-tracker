@@ -5,7 +5,7 @@ import RecordList from './components/RecordList.vue';
 import StatsCard from './components/StatsCard.vue';
 import UserHeader from './components/UserHeader.vue';
 import AllUsersStats from './components/AllUsersStats.vue';
-import { getTodayRecords, getWeekStats, deleteRecord, getAllUserStats, getRecordsByDate, fetchAllRecords } from './utils/storage';
+import { getTodayRecords, getWeekStats, deleteRecord, getAllUserStats, getRecordsByDate, fetchAllRecords, deleteTestRecords } from './utils/storage';
 import { ensureNickname, getNickname, setNickname } from './utils/user';
 import { computeAchievements, getNewAchievements, ACHIEVEMENTS } from './utils/achievements';
 
@@ -31,10 +31,14 @@ const selectedDate = ref(null);
 const selectedDateRecords = ref([]);
 const loadingHistory = ref(false);
 const myAllRecords = ref([]);
+const allRecordsRaw = ref([]);
 const unlockedAchievements = ref([]);
 const achievementToast = ref(null);
 const showAchievementsModal = ref(false);
 const alreadyUnlockedIds = new Set();
+const selectedFriend = ref(null);
+const friendRecords = ref([]);
+const cleaningTest = ref(false);
 
 const funFacts = [
   '热知识：每天排便1-3次都是正常的，不必焦虑',
@@ -72,6 +76,16 @@ const myWeekStats = computed(() => {
   return myWeekStatsData.value;
 });
 
+const isTestNickname = (name) => /^user/i.test(name);
+
+const filteredUserStats = computed(() => {
+  return allUserStats.value.filter(u => !isTestNickname(u.nickname));
+});
+
+const hasTestRecords = computed(() => {
+  return allUserStats.value.some(u => isTestNickname(u.nickname));
+});
+
 async function loadData() {
   currentNickname.value = ensureNickname();
   try {
@@ -88,6 +102,7 @@ async function loadData() {
     myWeekStatsData.value = myWeek;
 
     myAllRecords.value = allRecords.filter(r => r.nickname === currentNickname.value);
+    allRecordsRaw.value = allRecords;
     computeMyAchievements();
   } catch (e) {
     console.error('加载数据失败:', e);
@@ -155,6 +170,30 @@ async function handleDelete(id) {
   await deleteRecord(id);
   await loadData();
   refreshing.value = false;
+}
+
+function handleSelectFriend(nickname) {
+  selectedFriend.value = nickname;
+  friendRecords.value = allRecordsRaw.value
+    .filter(r => r.nickname === nickname)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function closeFriendModal() {
+  selectedFriend.value = null;
+  friendRecords.value = [];
+}
+
+async function handleCleanTestRecords() {
+  if (!confirm('确定要删除所有 user_ 开头的测试数据吗？此操作不可撤销。')) return;
+  cleaningTest.value = true;
+  const ok = await deleteTestRecords();
+  if (ok) {
+    await loadData();
+  } else {
+    alert('删除失败，请检查网络或 Supabase 连接');
+  }
+  cleaningTest.value = false;
 }
 
 function handleNicknameChange(newName) {
@@ -244,10 +283,13 @@ onMounted(async () => {
       </template>
 
       <template v-else>
-        <AllUsersStats :user-stats="allUserStats" :current-nickname="currentNickname" />
-        <RecordList 
-          :records="todayRecords" 
-          @delete="handleDelete" 
+        <AllUsersStats :user-stats="filteredUserStats" :current-nickname="currentNickname" @select-user="handleSelectFriend" />
+        <button v-if="hasTestRecords" class="clean-test-btn" @click="handleCleanTestRecords" :disabled="cleaningTest">
+          {{ cleaningTest ? '清理中...' : '🗑️ 清理测试数据' }}
+        </button>
+        <RecordList
+          :records="todayRecords.filter(r => !isTestNickname(r.nickname))"
+          @delete="handleDelete"
           :show-delete="false"
           :show-nickname="true"
         />
@@ -313,6 +355,21 @@ onMounted(async () => {
           :records="selectedDateRecords"
           :show-delete="false"
           :title="`📋 ${formatHistoryDate(selectedDate)} 的记录`"
+        />
+      </div>
+    </div>
+
+    <div v-if="selectedFriend" class="history-modal-overlay" @click.self="closeFriendModal">
+      <div class="history-modal">
+        <div class="history-modal-header">
+          <h3 class="history-modal-title">👥 {{ selectedFriend }} 的记录</h3>
+          <button class="history-modal-close" @click="closeFriendModal">✕</button>
+        </div>
+        <RecordList
+          :records="friendRecords"
+          :show-delete="false"
+          :show-nickname="false"
+          :title="`📋 近期记录（共${friendRecords.length}条）`"
         />
       </div>
     </div>
@@ -417,6 +474,28 @@ onMounted(async () => {
   padding: 20px;
   font-size: 12px;
   color: #aaa;
+}
+
+.clean-test-btn {
+  padding: 8px 16px;
+  border: 1px dashed #ccc;
+  background: white;
+  color: #888;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+  align-self: center;
+}
+
+.clean-test-btn:hover:not(:disabled) {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+.clean-test-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .history-modal-overlay {

@@ -6,11 +6,12 @@
       <p class="hint">快邀请朋友一起来记录吧！</p>
     </div>
     <div v-else class="user-cards">
-      <div 
-        v-for="user in sortedUsers" 
-        :key="user.nickname" 
+      <div
+        v-for="user in sortedUsers"
+        :key="user.nickname"
         class="user-card"
         :class="{ 'is-me': user.nickname === currentNickname }"
+        @click="$emit('select-user', user.nickname)"
       >
         <div class="user-card-header">
           <span class="user-name">{{ user.nickname }}</span>
@@ -29,6 +30,7 @@
             <span class="stat-dot" :class="getStatusDotClass(user.todayCount)"></span>
             <span class="stat-label">{{ getStatusText(user.todayCount) }}</span>
           </div>
+          <span class="view-hint">查看 ›</span>
         </div>
       </div>
     </div>
@@ -114,6 +116,12 @@ function getStatusText(count) {
   border-radius: 12px;
   border: 2px solid transparent;
   transition: all 0.2s;
+  cursor: pointer;
+}
+
+.user-card:hover {
+  background: #f0f0f0;
+  transform: translateY(-1px);
 }
 
 .user-card.is-me {
@@ -192,5 +200,12 @@ function getStatusText(count) {
 
 .dot-warning {
   background: #ff9800;
+}
+
+.view-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: #8B4513;
+  font-weight: 500;
 }
 </style>
