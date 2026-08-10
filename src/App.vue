@@ -369,6 +369,7 @@ onMounted(async () => {
           :records="friendRecords"
           :show-delete="false"
           :show-nickname="false"
+          :show-date="true"
           :title="`📋 近期记录（共${friendRecords.length}条）`"
         />
       </div>

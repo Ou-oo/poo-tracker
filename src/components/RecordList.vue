@@ -48,6 +48,10 @@ const props = defineProps({
   title: {
     type: String,
     default: '📋 今日记录'
+  },
+  showDate: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -64,6 +68,9 @@ const displayedRecords = computed(() => {
 
 function formatTime(timestamp) {
   const date = new Date(timestamp);
+  if (props.showDate) {
+    return `${date.getMonth() + 1}/${date.getDate()} ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
+  }
   return date.toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit'
