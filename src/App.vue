@@ -539,7 +539,7 @@ function formatNotificationTime(timestamp) {
 }
 
 .app-title {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 28px;
   color: #333;
 }
@@ -547,12 +547,12 @@ function formatNotificationTime(timestamp) {
 .notification-bell {
   position: absolute;
   right: 0;
-  top: 0;
+  top: 50%;
+  transform: translateY(-50%);
   background: none;
   border: none;
   font-size: 24px;
   cursor: pointer;
-  position: relative;
   padding: 4px;
 }
 
@@ -574,7 +574,7 @@ function formatNotificationTime(timestamp) {
 }
 
 .app-subtitle {
-  margin: 0;
+  margin: 8px 0 0 0;
   font-size: 14px;
   color: #888;
 }
