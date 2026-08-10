@@ -289,14 +289,16 @@ export async function getInteractionsForRecord(recordId) {
   return getLocalInteractions().filter(i => i.recordId === recordId);
 }
 
-export async function getNotifications(nickname) {
+export async function getNotifications(nickname, signal) {
   if (isSupabaseAvailable) {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('poo_interactions')
         .select('*')
         .eq('to_user', nickname)
         .order('created_at', { ascending: false });
+      if (signal) query = query.abortSignal(signal);
+      const { data, error } = await query;
       if (error) throw error;
       return data.map(i => ({
         id: i.id,
@@ -316,14 +318,16 @@ export async function getNotifications(nickname) {
   return getLocalInteractions().filter(i => i.toUser === nickname);
 }
 
-export async function getUnreadCount(nickname) {
+export async function getUnreadCount(nickname, signal) {
   if (isSupabaseAvailable) {
     try {
-      const { count, error } = await supabase
+      let query = supabase
         .from('poo_interactions')
         .select('*', { count: 'exact', head: true })
         .eq('to_user', nickname)
         .eq('is_read', false);
+      if (signal) query = query.abortSignal(signal);
+      const { count, error } = await query;
       if (error) throw error;
       return count || 0;
     } catch (e) {

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import QuickRecord from './components/QuickRecord.vue';
 import RecordList from './components/RecordList.vue';
 import StatsCard from './components/StatsCard.vue';
@@ -210,30 +210,53 @@ function toggleView() {
   viewMode.value = viewMode.value === 'mine' ? 'all' : 'mine';
 }
 
+let notificationInterval = null;
+let loadingNotifications = false;
+let abortController = null;
+
 onMounted(async () => {
   pickRandomFunFact();
   await loadData();
   initialLoading.value = false;
   await loadNotifications();
   // 每30秒轮询新通知
-  setInterval(loadNotifications, 30000);
+  notificationInterval = setInterval(loadNotifications, 30000);
+});
+
+onUnmounted(() => {
+  if (notificationInterval) clearInterval(notificationInterval);
+  if (abortController) abortController.abort();
 });
 
 async function loadNotifications() {
+  if (loadingNotifications) return;
   const nickname = getNickname();
   if (!nickname) return;
-  const [count, list] = await Promise.all([
-    getUnreadCount(nickname),
-    getNotifications(nickname)
-  ]);
-  // 检测新通知（之前没有的）
-  const prevIds = new Set(notifications.value.map(n => n.id));
-  const newOnes = list.filter(n => !prevIds.has(n.id) && !n.isRead);
-  unreadCount.value = count;
-  notifications.value = list;
-  // 弹窗提示新通知
-  if (newOnes.length > 0 && prevIds.size > 0) {
-    showNotificationToast(newOnes[0]);
+  loadingNotifications = true;
+  // 取消上一个未完成的请求
+  if (abortController) abortController.abort();
+  abortController = new AbortController();
+  const signal = abortController.signal;
+  try {
+    const [count, list] = await Promise.all([
+      getUnreadCount(nickname, signal),
+      getNotifications(nickname, signal)
+    ]);
+    if (signal.aborted) return;
+    // 检测新通知（之前没有的）
+    const prevIds = new Set(notifications.value.map(n => n.id));
+    const newOnes = list.filter(n => !prevIds.has(n.id) && !n.isRead);
+    unreadCount.value = count;
+    notifications.value = list;
+    // 弹窗提示新通知
+    if (newOnes.length > 0 && prevIds.size > 0) {
+      showNotificationToast(newOnes[0]);
+    }
+  } catch (e) {
+    if (e.name === 'AbortError' || signal.aborted) return;
+    console.warn('加载通知失败:', e.message);
+  } finally {
+    loadingNotifications = false;
   }
 }
 
